@@ -14,7 +14,7 @@
 -- posture. Idempotent: safe to re-run.
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION increment_flow_execution_count(p_flow_id UUID)
+/*CREATE OR REPLACE FUNCTION increment_flow_execution_count(p_flow_id UUID)
 RETURNS VOID
 LANGUAGE sql
 SECURITY DEFINER
@@ -33,4 +33,22 @@ $$;
 REVOKE ALL ON FUNCTION increment_flow_execution_count(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION increment_flow_execution_count(UUID) FROM anon;
 REVOKE ALL ON FUNCTION increment_flow_execution_count(UUID) FROM authenticated;
-GRANT EXECUTE ON FUNCTION increment_flow_execution_count(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION increment_flow_execution_count(UUID) TO service_role;*/
+
+
+CREATE TABLE IF NOT EXISTS flows (
+  id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'archived')),
+  trigger_type TEXT NOT NULL CHECK (trigger_type IN ('keyword', 'first_inbound_message', 'manual')),
+  trigger_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  -- 🔴 YEH DO COLUMNS APNI 010_flows.sql FILE MEIN ZAROOR JODEIN:
+  execution_count INTEGER NOT NULL DEFAULT 0,
+  last_executed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+

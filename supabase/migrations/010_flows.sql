@@ -74,8 +74,8 @@ ALTER TABLE messages
 -- ============================================================
 -- 2. flows
 -- ============================================================
-CREATE TABLE IF NOT EXISTS flows (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+/*CREATE TABLE IF NOT EXISTS flows (
+  id UUID PRIMARY KEY DEFAULT extensions. uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
@@ -94,7 +94,57 @@ CREATE TABLE IF NOT EXISTS flows (
   last_executed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);*/
+-- ============================================================
+-- 010_flows.sql — Flows feature
+-- ============================================================
+
+-- 1. FLOWS TABLE
+CREATE TABLE IF NOT EXISTS flows (
+  id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'archived')),
+  trigger_type TEXT NOT NULL CHECK (trigger_type IN ('keyword', 'first_inbound_message', 'manual')),
+  trigger_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_flows_user_id ON flows(user_id);
+
+-- 2. FLOW_NODES TABLE
+CREATE TABLE IF NOT EXISTS flow_nodes (
+  -- 🔴 FIXED: Added extensions. prefix here
+  id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  flow_id UUID NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+  node_key TEXT NOT NULL,
+  type TEXT NOT NULL,
+  configuration JSONB NOT NULL DEFAULT '{}'::jsonb,
+  position_x NUMERIC,
+  position_y NUMERIC,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (flow_id, node_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_flow_nodes_flow_id ON flow_nodes(flow_id);
+
+-- 3. FLOW_EDGES TABLE
+CREATE TABLE IF NOT EXISTS flow_edges (
+  -- 🔴 FIXED: Added extensions. prefix here
+  id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  flow_id UUID NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
+  source_node_key TEXT NOT NULL,
+  target_node_key TEXT NOT NULL,
+  source_handle TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (flow_id, source_node_key) REFERENCES flow_nodes(flow_id, node_key) ON DELETE CASCADE,
+  FOREIGN KEY (flow_id, target_node_key) REFERENCES flow_nodes(flow_id, node_key) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_flow_edges_flow_id ON flow_edges(flow_id);
 
 -- Active-only lookups dominate the runner's hot path. Partial index
 -- keeps it small even when archived flows accumulate.
@@ -154,7 +204,7 @@ CREATE POLICY "Users manage nodes on their flows" ON flow_nodes FOR ALL
 -- 4. flow_runs
 -- ============================================================
 CREATE TABLE IF NOT EXISTS flow_runs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT extensions. uuid_generate_v4(),
   flow_id UUID NOT NULL REFERENCES flows(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   -- contact_id intentionally SET NULL on delete (matches the
@@ -214,7 +264,7 @@ CREATE POLICY "Users see own flow runs" ON flow_runs FOR SELECT
 -- 5. flow_run_events
 -- ============================================================
 CREATE TABLE IF NOT EXISTS flow_run_events (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT extensions. uuid_generate_v4(),
   flow_run_id UUID NOT NULL REFERENCES flow_runs(id) ON DELETE CASCADE,
   event_type TEXT NOT NULL CHECK (event_type IN (
     'started',

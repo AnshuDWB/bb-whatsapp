@@ -5,12 +5,39 @@
 -- ============================================================
 
 -- Enable UUID extension
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================
 -- PROFILES
 -- ============================================================
+-- Sabse pehle yeh line add karein:
+/*SELECT set_config('search_path', 'public, extensions, auth', false);
+
+-- Iske baad aapka normal code chalega (bina extensions. prefix ke bhi kaam kar jayega):
 CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  
+);
+
+CREATE TABLE IF NOT EXISTS contacts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  
+  --CREATE TABLE IF NOT EXISTS profiles (
+ -- id UUID PRIMARY KEY DEFAULT extensions. uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  avatar_url TEXT,
+  role TEXT DEFAULT 'user',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);*/
+ 
+SELECT set_config('search_path', 'public, extensions, auth', false);
+
+CREATE TABLE IF NOT EXISTS profiles  (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT NOT NULL,
@@ -21,6 +48,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id)
 );
+
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own profile" ON profiles;

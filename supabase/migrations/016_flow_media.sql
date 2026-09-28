@@ -37,7 +37,7 @@ ALTER TABLE flow_nodes
 
 ALTER TABLE flow_nodes
   ADD CONSTRAINT flow_nodes_node_type_check
-  CHECK (node_type IN (
+  CHECK (type IN (
     'start',
     'send_buttons',
     'send_list',
