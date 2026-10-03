@@ -203,6 +203,17 @@ export async function GET(request: Request) {
       })
     }
 
+    // Fallback: check the static env-based verify token so webhook
+    // verification works even before a whatsapp_config row is saved
+    // (e.g. during initial Meta webhook setup).
+    const envVerifyToken = process.env.WEBHOOK_VERIFY_TOKEN
+    if (envVerifyToken && verifyToken === envVerifyToken) {
+      return new Response(challenge, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    }
+
     return NextResponse.json(
       { error: 'Verification token mismatch' },
       { status: 403 }
