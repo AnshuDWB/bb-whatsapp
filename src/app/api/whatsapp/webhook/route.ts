@@ -136,6 +136,7 @@ interface WhatsAppWebhookEntry {
 
 // GET - Webhook verification
 export async function GET(request: Request) {
+  console.log('[webhook] ✅ GET /api/whatsapp/webhook HIT — verification attempt at', new Date().toISOString())
   try {
     const { searchParams } = new URL(request.url)
     const mode = searchParams.get('hub.mode')
@@ -229,18 +230,24 @@ export async function GET(request: Request) {
 
 // POST - Receive messages
 export async function POST(request: Request) {
+  console.log('[webhook] ✅ POST /api/whatsapp/webhook HIT at', new Date().toISOString())
+
   // Read raw body first so we can HMAC-verify the exact bytes Meta
   // signed. request.json() would re-encode and break the signature.
   const rawBody = await request.text()
   const signature = request.headers.get('x-hub-signature-256')
 
+  console.log('[webhook] Signature header present:', !!signature)
+  console.log('[webhook] Raw body length:', rawBody.length, 'bytes')
+
   if (!verifyMetaWebhookSignature(rawBody, signature)) {
     // 401 (not 200) — we want Meta's delivery dashboard to show failures
     // loudly if a misconfiguration causes signatures to stop matching,
     // rather than silently eating events.
-    console.warn('[webhook] rejected request with invalid signature')
+    console.warn('[webhook] ❌ REJECTED — invalid signature. Check META_APP_SECRET matches your Meta App\'s App Secret')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
+  console.log('[webhook] ✅ Signature verified')
 
   let body: { entry?: WhatsAppWebhookEntry[] }
   try {
@@ -275,7 +282,11 @@ export async function POST(request: Request) {
 }
 
 async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
-  if (!body.entry) return
+  if (!body.entry) {
+    console.warn('[webhook] ⚠️ No entry array in body — nothing to process')
+    return
+  }
+  console.log('[webhook] Processing', body.entry.length, 'entry(ies)')
 
   for (const entry of body.entry) {
     for (const change of entry.changes) {
@@ -309,7 +320,13 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       }
 
       // Handle incoming messages
-      if (!value.messages || !value.contacts) continue
+      if (!value.messages || !value.contacts) {
+        if (!value.messages && !value.statuses) {
+          console.log('[webhook] Change has no messages and no statuses — field:', change.field)
+        }
+        continue
+      }
+      console.log('[webhook] 📩 Incoming messages:', value.messages.length, 'from phone_number_id:', value.metadata.phone_number_id)
 
       const phoneNumberId = value.metadata.phone_number_id
 
@@ -333,7 +350,7 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       }
 
       if (!configRows || configRows.length === 0) {
-        console.error('No config found for phone_number_id:', phoneNumberId)
+        console.error('❌ No config found for phone_number_id:', phoneNumberId, '— Make sure this phone number ID is saved in your WhatsApp Settings page')
         continue
       }
 
