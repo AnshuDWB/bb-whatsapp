@@ -55,6 +55,11 @@ export function verifyMetaWebhookSignature(
   rawBody: string,
   signatureHeader: string | null,
 ): boolean {
+  if (process.env.SKIP_WEBHOOK_SIGNATURE_VERIFY === 'true') {
+    console.warn('[webhook] ⚠️ WARNING: Webhook signature verification bypassed via SKIP_WEBHOOK_SIGNATURE_VERIFY=true')
+    return true
+  }
+
   const secrets = parseAppSecrets(process.env.META_APP_SECRET)
   if (secrets.length === 0) {
     console.error(
@@ -76,5 +81,15 @@ export function verifyMetaWebhookSignature(
   for (const secret of secrets) {
     if (signatureMatches(rawBody, signatureHeader, secret)) ok = true
   }
+
+  if (!ok) {
+    console.error(
+      '[webhook] ❌ Signature verification failed! ' +
+      'Your META_APP_SECRET does not match the App Secret of your Meta App. ' +
+      'Meta rejected this delivery. Get your correct App Secret from: ' +
+      'Meta Developer Console -> App Settings -> Basic -> App Secret'
+    )
+  }
+
   return ok
 }
